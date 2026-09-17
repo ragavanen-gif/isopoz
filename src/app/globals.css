@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+/* ===========================================================
+   ISOPoz — Charte : sobre, professionnelle, claire.
+   Palette neutre (slate) + primaire bleu profond.
+   =========================================================== */
+:root {
+  --background: #f7f8fa;       /* fond app */
+  --surface: #ffffff;          /* cartes, panneaux */
+  --foreground: #0f172a;       /* texte principal (slate-900) */
+  --muted: #f1f5f9;            /* slate-100 */
+  --muted-foreground: #64748b; /* slate-500 */
+  --border: #e2e8f0;           /* slate-200 */
+  --input: #e2e8f0;
+  --ring: #1d4ed8;
+
+  --primary: #1d4ed8;          /* blue-700 */
+  --primary-foreground: #ffffff;
+  --sidebar: #0f172a;          /* slate-900 (menu latéral foncé) */
+  --sidebar-foreground: #cbd5e1;
+  --sidebar-active: #1d4ed8;
+
+  --success: #16a34a;
+  --warning: #d97706;
+  --danger: #dc2626;
+  --info: #0891b2;
+
+  --radius: 0.6rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-active: var(--sidebar-active);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --radius-app: var(--radius);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+* {
+  border-color: var(--border);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
