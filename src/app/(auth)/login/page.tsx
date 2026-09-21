@@ -11,10 +11,11 @@ export default async function LoginPage({
     <main className="flex min-h-screen items-center justify-center bg-sidebar p-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold tracking-tight text-white">ISOPoz</h1>
-          <p className="mt-1 text-sm text-sidebar-foreground">Gestion interne</p>
+          <p className="text-sm text-sidebar-foreground">Espace professionnel — Gestion interne</p>
         </div>
         <div className="rounded-[var(--radius-app)] bg-surface p-6 shadow-xl">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="ISOPOZ" className="mx-auto mb-5 h-12 w-auto" />
           <h2 className="mb-1 text-lg font-semibold">Connexion</h2>
           <p className="mb-5 text-sm text-muted-foreground">
             Accédez à votre espace de travail.

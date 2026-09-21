@@ -1,7 +1,17 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/forgot-password", "/reset-password"];
+// Pages d'authentification
+const AUTH_PATHS = ["/login", "/forgot-password", "/reset-password"];
+// Site vitrine public (accessible sans connexion)
+const SITE_PREFIXES = ["/realisations", "/avis", "/a-propos", "/contact"];
+
+function isPublicPath(path: string): boolean {
+  if (path === "/") return true; // accueil du site
+  if (AUTH_PATHS.some((p) => path.startsWith(p))) return true;
+  if (SITE_PREFIXES.some((p) => path === p || path.startsWith(p + "/"))) return true;
+  return false;
+}
 
 /** Rafraîchit la session Supabase et protège les routes authentifiées. */
 export async function updateSession(request: NextRequest) {
@@ -31,9 +41,8 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
-  const isPublic = PUBLIC_PATHS.some((p) => path.startsWith(p));
 
-  if (!user && !isPublic) {
+  if (!user && !isPublicPath(path)) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("redirect", path);

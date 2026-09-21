@@ -41,6 +41,13 @@ Développement incrémental (CDC §42). Chaque phase doit rester compatible avec
 - [x] Négociations (historique fournisseur/ISOPoz + **prix final + économie** calculée)
 - [~] Produits / réceptions : tables `products`/`goods_receipts` créées ; catalogue & bons de réception dédiés à ajouter au besoin
 
+## Site vitrine public + simulateur ✅ (migration 0009)
+- [x] Charte **couleurs du logo ISOPOZ** (marine `#22304C`, orange `#E8641C`, gris ardoise) + logo dans en-tête site / login
+- [x] Pages publiques (route group `(site)`, sans auth) : Accueil, Nos réalisations, Avis clients, À propos, Contact
+- [x] **Simulateur d'estimation configurable** depuis l'admin (prestations + tarifs) → génère un lead
+- [x] Formulaire de contact → lead + notification
+- [x] Gestion depuis l'admin (`admin.settings`) : contenu du site, avis, réalisations (upload photo, bucket public `site-media`), prestations du simulateur, demandes reçues (leads)
+
 ## Phase 6 — Automatisation (partiel)
 - [x] **Notifications in-app** : cloche + compteur non-lus (Topbar), page `/notifications`, ciblage par permission (`users_with_permission`), création auto sur nouvelle demande & devis accepté
 - [x] **Cron quotidien** (Vercel, `/api/cron/daily`, sécurisé par `CRON_SECRET`) : expire les devis périmés + alerte impayés (relances)

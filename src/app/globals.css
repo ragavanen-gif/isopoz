@@ -5,25 +5,28 @@
    Palette neutre (slate) + primaire bleu profond.
    =========================================================== */
 :root {
-  --background: #f7f8fa;       /* fond app */
+  /* Charte ISOPOZ (couleurs du logo) : marine #22304C, orange #E8641C, gris ardoise */
+  --background: #f6f7f9;       /* fond app */
   --surface: #ffffff;          /* cartes, panneaux */
-  --foreground: #0f172a;       /* texte principal (slate-900) */
-  --muted: #f1f5f9;            /* slate-100 */
-  --muted-foreground: #64748b; /* slate-500 */
-  --border: #e2e8f0;           /* slate-200 */
-  --input: #e2e8f0;
-  --ring: #1d4ed8;
+  --foreground: #1a2439;       /* texte principal (marine sombre) */
+  --muted: #eef1f5;
+  --muted-foreground: #6e7b8c; /* gris ardoise du logo */
+  --border: #e0e5ec;
+  --input: #e0e5ec;
+  --ring: #22304c;
 
-  --primary: #1d4ed8;          /* blue-700 */
+  --primary: #22304c;          /* marine (logo) */
   --primary-foreground: #ffffff;
-  --sidebar: #0f172a;          /* slate-900 (menu latéral foncé) */
-  --sidebar-foreground: #cbd5e1;
-  --sidebar-active: #1d4ed8;
+  --accent: #e8641c;           /* orange (logo) */
+  --accent-foreground: #ffffff;
+  --sidebar: #1a2740;          /* marine foncé (menu latéral) */
+  --sidebar-foreground: #b7c1d4;
+  --sidebar-active: #e8641c;   /* orange sur l'item actif */
 
   --success: #16a34a;
   --warning: #d97706;
   --danger: #dc2626;
-  --info: #0891b2;
+  --info: #0e7490;
 
   --radius: 0.6rem;
 }
@@ -39,6 +42,8 @@
   --color-ring: var(--ring);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-active: var(--sidebar-active);

@@ -101,6 +101,7 @@ export const NAV: NavGroup[] = [
     items: [
       { label: "Utilisateurs", href: "/administration/utilisateurs", permission: "admin.users" },
       { label: "Rôles", href: "/administration/roles", permission: "admin.roles" },
+      { label: "Site internet", href: "/administration/site", permission: "admin.settings" },
       { label: "Journal d'activité", href: "/administration/journal", permission: "admin.audit" },
       { label: "Paramètres", href: "/administration/parametres", permission: "admin.settings" },
     ],
