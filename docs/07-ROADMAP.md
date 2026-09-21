@@ -45,8 +45,8 @@ Développement incrémental (CDC §42). Chaque phase doit rester compatible avec
 - [x] **Notifications in-app** : cloche + compteur non-lus (Topbar), page `/notifications`, ciblage par permission (`users_with_permission`), création auto sur nouvelle demande & devis accepté
 - [x] **Cron quotidien** (Vercel, `/api/cron/daily`, sécurisé par `CRON_SECRET`) : expire les devis périmés + alerte impayés (relances)
 - [x] Rapports : couverts par le module Analyses (Phase 4)
-- [ ] Connexion email → demandes (nécessite un service d'email entrant — Phase 6b)
-- [ ] Génération auto de documents (PDF facture, envoi) + emails Resend (nécessite `RESEND_API_KEY`)
+- [x] **Envoi d'emails (Phase 6b)** via SMTP Hostinger (`nodemailer`) : devis (PDF joint), facture (PDF joint), relance — boutons sur les fiches. PDF facture généré (`invoice-pdf.tsx`).
+- [ ] Connexion email → demandes entrantes (nécessite un service d'email entrant / webhook — Phase 6c)
 
 ---
 _État au 2026-09-21 : **Phases 0 à 6 livrées** (Phase 6 : notifications + cron ; emails Resend et email→demande restent en 6b), en PRODUCTION sur https://isopoz.fr. Build Turbopack OK, typecheck OK. Reste : Phase 6b (emails Resend, email entrant→demandes, PDF facture auto) et Phase 3b (portail salarié + paie/RH). Migrations à jour dans `supabase/deploy_all.sql` (0001-0007)._

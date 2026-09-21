@@ -11,7 +11,9 @@ import {
 } from "@/modules/quotes/schema";
 import { QuoteItemsEditor } from "@/modules/quotes/quote-items-editor";
 import { GenerateQuotePdfButton } from "@/modules/quotes/generate-pdf-button";
+import { sendQuoteByEmailAction } from "@/modules/quotes/email-actions";
 import { createProjectFromQuoteAction } from "@/modules/projects/actions";
+import { AsyncActionButton } from "@/components/ui/async-action-button";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
@@ -37,6 +39,7 @@ export default async function QuoteDetailPage({ params }: PageProps<"/commercial
   const canDelete = user ? userCan(user, "quotes.delete") : false;
   const canGenerate = user ? userCan(user, "documents.upload") : false;
   const canCreateProject = user ? userCan(user, "projects.create") : false;
+  const canSendEmail = user ? userCan(user, "quotes.send") : false;
   const editable = canEdit && QUOTE_EDITABLE_STATUSES.includes(quote.status);
   const nextStatuses = QUOTE_TRANSITIONS[quote.status];
   const saveMeta = updateQuoteMetaAction.bind(null, id);
@@ -130,9 +133,17 @@ export default async function QuoteDetailPage({ params }: PageProps<"/commercial
                 )}
               </div>
             )}
-            {canGenerate && (
-              <div className="border-t border-border pt-3">
-                <GenerateQuotePdfButton quoteId={id} />
+            {(canGenerate || canSendEmail) && (
+              <div className="space-y-2 border-t border-border pt-3">
+                {canGenerate && <GenerateQuotePdfButton quoteId={id} />}
+                {canSendEmail && (
+                  <AsyncActionButton
+                    action={sendQuoteByEmailAction.bind(null, id)}
+                    label="Envoyer par email"
+                    pendingLabel="Envoi…"
+                    successMessage="Devis envoyé au client par email."
+                  />
+                )}
               </div>
             )}
           </CardContent>

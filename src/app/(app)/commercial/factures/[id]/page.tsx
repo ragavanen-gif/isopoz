@@ -8,8 +8,10 @@ import {
   updateInvoiceMetaAction, sendInvoiceAction, recordPaymentAction,
   deletePaymentAction, addReminderAction, deleteInvoiceAction,
 } from "@/modules/invoices/actions";
+import { sendInvoiceByEmailAction, sendReminderByEmailAction } from "@/modules/invoices/email-actions";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
+import { AsyncActionButton } from "@/components/ui/async-action-button";
 import { Input, Textarea, Select } from "@/components/ui/input";
 import { Field } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardContent, StatCard } from "@/components/ui/card";
@@ -44,8 +46,17 @@ export default async function InvoiceDetailPage({ params }: PageProps<"/commerci
         actions={
           <div className="flex items-center gap-2">
             <StatusBadge status={invoice.effective_status} />
+            {canSend && (
+              <AsyncActionButton
+                action={sendInvoiceByEmailAction.bind(null, id)}
+                label="Envoyer par email"
+                pendingLabel="Envoi…"
+                successMessage="Facture envoyée au client."
+                variant="primary"
+              />
+            )}
             {canSend && invoice.status === "brouillon" && (
-              <form action={sendInvoiceAction.bind(null, id)}><Button type="submit" size="sm">Marquer envoyée</Button></form>
+              <form action={sendInvoiceAction.bind(null, id)}><Button type="submit" variant="secondary" size="sm">Marquer envoyée</Button></form>
             )}
             {invoice.project_id && <Link href={`/chantiers/${invoice.project_id}`}><Button variant="ghost" size="sm">Chantier</Button></Link>}
             {canDelete && <form action={deleteInvoiceAction.bind(null, id)}><Button type="submit" variant="secondary" size="sm">Supprimer</Button></form>}
@@ -146,10 +157,19 @@ export default async function InvoiceDetailPage({ params }: PageProps<"/commerci
               </ul>
             )}
             {canRemind && invoice.effective_status !== "payee" && (
-              <form action={addReminderAction.bind(null, id)} className="flex items-end gap-2 border-t border-border pt-3">
-                <div className="flex-1 space-y-1"><label className="text-xs text-muted-foreground">Note (optionnel)</label><Input name="note" className="h-9" placeholder="Commentaire de relance" /></div>
-                <Button type="submit" size="sm" variant="secondary">Ajouter une relance</Button>
-              </form>
+              <div className="space-y-3 border-t border-border pt-3">
+                <AsyncActionButton
+                  action={sendReminderByEmailAction.bind(null, id, undefined)}
+                  label="Relancer par email"
+                  pendingLabel="Envoi…"
+                  successMessage="Relance envoyée au client par email."
+                  variant="primary"
+                />
+                <form action={addReminderAction.bind(null, id)} className="flex items-end gap-2">
+                  <div className="flex-1 space-y-1"><label className="text-xs text-muted-foreground">Relance manuelle (sans email)</label><Input name="note" className="h-9" placeholder="Commentaire" /></div>
+                  <Button type="submit" size="sm" variant="secondary">Enregistrer</Button>
+                </form>
+              </div>
             )}
           </CardContent>
         </Card>
