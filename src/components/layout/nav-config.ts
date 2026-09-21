@@ -24,6 +24,15 @@ export const NAV: NavGroup[] = [
     items: [{ label: "Dashboard", href: "/dashboard" }],
   },
   {
+    label: "Mon espace",
+    icon: "UserCircle",
+    items: [
+      { label: "Accueil", href: "/portail", permission: "portal.self" },
+      { label: "Mes demandes", href: "/portail/demandes", permission: "portal.self" },
+      { label: "Mes fiches de paie", href: "/portail/paie", permission: "portal.self" },
+    ],
+  },
+  {
     label: "Clients",
     icon: "Users",
     items: [

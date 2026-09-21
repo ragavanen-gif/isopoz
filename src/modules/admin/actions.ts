@@ -83,6 +83,15 @@ export async function setUserRolesAction(userId: string, formData: FormData) {
   revalidatePath("/administration/utilisateurs");
 }
 
+export async function setUserEmployeeAction(userId: string, formData: FormData) {
+  const actor = await requirePermission("admin.users");
+  const employeeId = String(formData.get("employeeId") ?? "");
+  const admin = createAdminClient();
+  await admin.from("users").update({ employee_id: employeeId || null }).eq("id", userId);
+  await writeAudit({ userId: actor.id, action: "user.link_employee", entityType: "user", entityId: userId, after: { employeeId: employeeId || null } });
+  revalidatePath(`/administration/utilisateurs/${userId}`);
+}
+
 export async function setRolePermissionsAction(roleId: string, formData: FormData) {
   const actor = await requirePermission("admin.roles");
   const permIds = formData.getAll("permIds").map(String);

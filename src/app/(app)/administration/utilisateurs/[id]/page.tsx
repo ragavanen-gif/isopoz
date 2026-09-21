@@ -2,10 +2,12 @@ import { notFound } from "next/navigation";
 import { requirePermission } from "@/core/auth/session";
 import { createClient as createServerClient } from "@/core/supabase/server";
 import { listRoles, getUserRoleIds } from "@/modules/admin/queries";
-import { setUserRolesAction, setUserStatusAction } from "@/modules/admin/actions";
+import { setUserRolesAction, setUserStatusAction, setUserEmployeeAction } from "@/modules/admin/actions";
+import { listEmployees } from "@/modules/employees/queries";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/input";
 import { Badge, StatusBadge } from "@/components/ui/badge";
 
 export default async function UserDetailPage({ params }: PageProps<"/administration/utilisateurs/[id]">) {
@@ -15,13 +17,14 @@ export default async function UserDetailPage({ params }: PageProps<"/administrat
   const supabase = await createServerClient();
   const { data: user } = await supabase
     .from("users")
-    .select("id, email, full_name, status, is_super_admin")
+    .select("id, email, full_name, status, is_super_admin, employee_id")
     .eq("id", id)
     .maybeSingle();
   if (!user) notFound();
 
-  const [roles, userRoleIds] = await Promise.all([listRoles(), getUserRoleIds(id)]);
+  const [roles, userRoleIds, employees] = await Promise.all([listRoles(), getUserRoleIds(id), listEmployees()]);
   const saveRoles = setUserRolesAction.bind(null, id);
+  const saveEmployee = setUserEmployeeAction.bind(null, id);
   const nextStatus = user.status === "active" ? "disabled" : "active";
   const toggleStatus = setUserStatusAction.bind(null, id, nextStatus);
 
@@ -86,6 +89,24 @@ export default async function UserDetailPage({ params }: PageProps<"/administrat
             <p className="text-xs text-muted-foreground">
               Un compte désactivé ne peut plus se connecter.
             </p>
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-3">
+          <CardHeader>
+            <CardTitle>Fiche salarié liée</CardTitle>
+            <CardDescription>
+              Relier ce compte à une fiche salarié active son portail personnel (planning, demandes, fiches de paie).
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form action={saveEmployee} className="flex flex-wrap items-end gap-2">
+              <Select name="employeeId" defaultValue={user.employee_id ?? ""} className="max-w-xs">
+                <option value="">Aucune (pas de portail)</option>
+                {employees.map((e) => <option key={e.id} value={e.id}>{e.last_name} {e.first_name}</option>)}
+              </Select>
+              <Button type="submit">Enregistrer</Button>
+            </form>
           </CardContent>
         </Card>
       </div>

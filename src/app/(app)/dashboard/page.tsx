@@ -1,4 +1,5 @@
-import { requireAuth } from "@/core/auth/session";
+import { redirect } from "next/navigation";
+import { requireAuth, userCan } from "@/core/auth/session";
 import { createClient } from "@/core/supabase/server";
 import { PageHeader } from "@/components/layout/page-header";
 import { StatCard, Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -6,6 +7,10 @@ import { euros } from "@/lib/format";
 
 export default async function DashboardPage() {
   const user = await requireAuth();
+  // Salarié « pur » (portail sans accès gestionnaire) → redirigé vers son espace.
+  if (userCan(user, "portal.self") && !userCan(user, "clients.view") && !userCan(user, "analytics.view") && !user.isSuperAdmin) {
+    redirect("/portail");
+  }
   const supabase = await createClient();
   const now = new Date();
   const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;

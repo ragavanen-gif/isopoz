@@ -10,6 +10,7 @@ export type SessionUser = {
   fullName: string | null;
   isSuperAdmin: boolean;
   status: "active" | "disabled";
+  employeeId: string | null;
   permissions: Set<string>;
 };
 
@@ -26,7 +27,7 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   if (!user) return null;
 
   const [{ data: profile }, { data: permRows }] = await Promise.all([
-    supabase.from("users").select("full_name, is_super_admin, status").eq("id", user.id).single(),
+    supabase.from("users").select("full_name, is_super_admin, status, employee_id").eq("id", user.id).single(),
     supabase.rpc("my_permission_keys"),
   ]);
 
@@ -40,6 +41,7 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
     fullName: profile?.full_name ?? null,
     isSuperAdmin: profile?.is_super_admin ?? false,
     status: (profile?.status as "active" | "disabled") ?? "active",
+    employeeId: (profile?.employee_id as string | null) ?? null,
     permissions,
   };
 });
