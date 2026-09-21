@@ -1,10 +1,19 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Search, LogOut, ChevronDown } from "lucide-react";
+import Link from "next/link";
+import { Search, LogOut, ChevronDown, Bell } from "lucide-react";
 import { signOut } from "@/app/(auth)/actions";
 
-export function Topbar({ fullName, email }: { fullName: string | null; email: string }) {
+export function Topbar({
+  fullName,
+  email,
+  unreadCount = 0,
+}: {
+  fullName: string | null;
+  email: string;
+  unreadCount?: number;
+}) {
   const [menuOpen, setMenuOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -34,7 +43,20 @@ export function Topbar({ fullName, email }: { fullName: string | null; email: st
         />
       </div>
 
-      <div ref={ref} className="relative ml-auto">
+      <Link
+        href="/notifications"
+        className="relative ml-auto flex size-9 items-center justify-center rounded-md hover:bg-muted"
+        aria-label="Notifications"
+      >
+        <Bell className="size-5 text-muted-foreground" />
+        {unreadCount > 0 && (
+          <span className="absolute -right-0.5 -top-0.5 flex min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold text-white">
+            {unreadCount > 9 ? "9+" : unreadCount}
+          </span>
+        )}
+      </Link>
+
+      <div ref={ref} className="relative">
         <button
           onClick={() => setMenuOpen((v) => !v)}
           className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"

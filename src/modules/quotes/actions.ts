@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/core/auth/session";
 import { createAdminClient } from "@/core/supabase/admin";
 import { writeAudit } from "@/core/audit/write";
+import { notifyByPermission } from "@/core/notifications/create";
 import {
   quoteMetaSchema, quoteItemsSchema, QUOTE_TRANSITIONS, QUOTE_EDITABLE_STATUSES,
   type QuoteStatus,
@@ -131,6 +132,16 @@ export async function setQuoteStatusAction(quoteId: string, next: QuoteStatus) {
   }
 
   await writeAudit({ userId: user.id, action: `quote.status.${next}`, entityType: "quote", entityId: quoteId, before: { status: from }, after: { status: next } });
+  if (next === "accepte") {
+    const { data: q } = await admin.from("quotes").select("reference").eq("id", quoteId).single();
+    await notifyByPermission("projects.create", {
+      type: "quote.accepted",
+      title: "🔔 Devis accepté",
+      body: `${q?.reference ?? "Devis"} accepté — un chantier peut être créé.`,
+      entityType: "quote",
+      entityId: quoteId,
+    });
+  }
   revalidatePath(`/commercial/devis/${quoteId}`);
   revalidatePath("/commercial/devis");
 }

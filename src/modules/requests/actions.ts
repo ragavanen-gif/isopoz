@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/core/auth/session";
 import { createAdminClient } from "@/core/supabase/admin";
 import { writeAudit } from "@/core/audit/write";
+import { notifyByPermission } from "@/core/notifications/create";
 import { requestSchema, REQUEST_TRANSITIONS, type RequestStatus } from "./schema";
 
 type Result = { ok: true; id: string } | { ok: false; error: string; fieldErrors?: Record<string, string> };
@@ -49,6 +50,13 @@ export async function createRequestAction(_prev: Result | null, formData: FormDa
     .single();
   if (error || !data) return { ok: false, error: error?.message ?? "Échec." };
   await writeAudit({ userId: user.id, action: "request.create", entityType: "customer_request", entityId: data.id, after: parsed.data });
+  await notifyByPermission("requests.view", {
+    type: "request.new",
+    title: "🔔 Nouvelle demande client",
+    body: parsed.data.subject.trim(),
+    entityType: "customer_request",
+    entityId: data.id,
+  }, user.id);
   revalidatePath("/demandes");
   redirect(`/demandes/${data.id}`);
 }
