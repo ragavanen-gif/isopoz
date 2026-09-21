@@ -35,10 +35,11 @@ Développement incrémental (CDC §42). Chaque phase doit rester compatible avec
 - [x] Relances : niveaux 1-3, vue impayés dédiée
 - [x] Analyses CA : **CA facturé vs encaissé** (distincts), par mois, par client, restant à encaisser, en retard, **rentabilité chantiers**
 
-## Phase 5 — Achats
-- [ ] Fournisseurs, produits
-- [ ] Commandes, réceptions
-- [ ] Négociations (historique, économie)
+## Phase 5 — Achats ✅
+- [x] Fournisseurs (CRUD + fiche + commandes liées)
+- [x] Commandes fournisseur (lignes, totaux serveur `recompute_po_totals`, statuts, lien chantier)
+- [x] Négociations (historique fournisseur/ISOPoz + **prix final + économie** calculée)
+- [~] Produits / réceptions : tables `products`/`goods_receipts` créées ; catalogue & bons de réception dédiés à ajouter au besoin
 
 ## Phase 6 — Automatisation
 - [ ] Connexion email → demandes
@@ -48,4 +49,4 @@ Développement incrémental (CDC §42). Chaque phase doit rester compatible avec
 - [ ] Rapports
 
 ---
-_État au 2026-09-17 : architecture rédigée, **Phases 0 à 4 livrées** (+ 2b). Build Turbopack OK, typecheck OK. Le cycle COMPLET Client → Demande → Devis → Chantier → Planning → Facture → Paiement → Analyse est opérationnel de bout en bout. Prochaine étape : Phase 5 (achats : fournisseurs, commandes, négociations) puis Phase 6 (automatisation : emails, notifications, relances auto)._
+_État au 2026-09-21 : **Phases 0 à 5 livrées** (+ 2b), en PRODUCTION sur https://isopoz.fr. Build Turbopack OK, typecheck OK. Reste Phase 6 (automatisation : emails → demandes, notifications, relances auto, rapports) et Phase 3b (portail salarié + paie/RH). Exécuter `supabase/deploy_all.sql` (inclut désormais 0006_purchasing) sur Supabase pour activer le module Achats._
