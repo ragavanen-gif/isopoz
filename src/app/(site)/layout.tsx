@@ -20,9 +20,9 @@ export default async function SiteLayout({ children }: LayoutProps<"/">) {
   return (
     <div className="flex min-h-screen flex-col bg-surface">
       <header className="sticky top-0 z-30 border-b border-border bg-surface/90 backdrop-blur">
-        <div className="mx-auto flex h-20 max-w-6xl items-center justify-between px-4">
+        <div className="mx-auto flex h-24 max-w-6xl items-center justify-between px-4">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <Link href="/"><img src="/logo.png" alt={s.company_name} className="h-14 w-auto" /></Link>
+          <Link href="/"><img src="/logo.png" alt={s.company_name} className="h-16 w-auto sm:h-20" /></Link>
           <nav className="hidden items-center gap-6 md:flex">
             {NAV.map((n) => (
               <Link key={n.href} href={n.href} className="text-sm font-medium text-foreground hover:text-accent">{n.label}</Link>
