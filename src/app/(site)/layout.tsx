@@ -19,7 +19,7 @@ export default async function SiteLayout({ children }: LayoutProps<"/">) {
   const s = await getSiteSettings();
   return (
     <div className="flex min-h-screen flex-col bg-surface">
-      <header className="sticky top-0 z-30 border-b border-border bg-surface/90 backdrop-blur">
+      <header className="sticky top-0 z-30 border-b border-border bg-surface shadow-sm">
         <div className="mx-auto flex h-24 max-w-6xl items-center justify-between px-4">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <Link href="/"><img src="/logo.png" alt={s.company_name} className="h-16 w-auto sm:h-20" /></Link>
