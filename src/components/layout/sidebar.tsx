@@ -19,6 +19,15 @@ export function Sidebar({ groups }: { groups: NavGroup[] }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
+  // Détermine l'item actif LE PLUS PRÉCIS (évite qu'un parent reste surligné
+  // quand on est sur un de ses enfants, ex. /portail vs /portail/demandes).
+  const allHrefs = groups.flatMap((g) => g.items.map((i) => i.href));
+  let activeHref: string | null = allHrefs.find((h) => h === pathname) ?? null;
+  if (!activeHref) {
+    const prefixes = allHrefs.filter((h) => pathname.startsWith(h + "/"));
+    activeHref = prefixes.sort((a, b) => b.length - a.length)[0] ?? null;
+  }
+
   const nav = (
     <nav className="flex flex-col gap-6 p-4">
       <Link href="/dashboard" className="px-2 text-2xl font-bold tracking-tight text-white">
@@ -35,8 +44,7 @@ export function Sidebar({ groups }: { groups: NavGroup[] }) {
               </div>
               <ul className="flex flex-col">
                 {group.items.map((item) => {
-                  const active =
-                    pathname === item.href || pathname.startsWith(item.href + "/");
+                  const active = item.href === activeHref;
                   return (
                     <li key={item.href}>
                       <Link
