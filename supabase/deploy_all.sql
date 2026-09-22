@@ -1,10 +1,7 @@
 -- ISOPoz — Script de déploiement complet (ERP + site public)
 -- À coller en UNE fois dans Supabase → SQL Editor → Run. Idempotent.
 
-
--- ============================================================
 -- >>> migrations/0001_core.sql
--- ============================================================
 -- ISOPoz — Migration 0001 : noyau (users, rôles, permissions, RLS, audit, clients)
 -- À exécuter dans le SQL editor Supabase (ou via CLI). Idempotent autant que possible.
 
@@ -352,9 +349,7 @@ create policy notif_update on public.notifications for update
   using ( user_id = auth.uid() ) with check ( user_id = auth.uid() );
 
 
--- ============================================================
 -- >>> migrations/0002_commercial.sql
--- ============================================================
 -- ISOPoz — Migration 0002 : workflow commercial (demandes, devis, documents/modèles)
 -- Exécuter après 0001_core.sql. Idempotent autant que possible.
 
@@ -596,9 +591,7 @@ create policy docs_write on public.documents for all
   with check ( auth_is_super_admin() or auth_has_permission('documents.upload') or auth_has_permission('documents.edit') );
 
 
--- ============================================================
 -- >>> migrations/0003_storage.sql
--- ============================================================
 -- ISOPoz — Migration 0003 : buckets Storage (documents clients & RH)
 -- Exécuter après 0002. Les buckets sont PRIVÉS : aucun accès anon/authenticated.
 -- Tout accès passe par des URL signées générées côté serveur (service_role)
@@ -617,9 +610,7 @@ on conflict (id) do nothing;
 -- Les téléchargements se font via createSignedUrl (route /api/documents/[id]/download).
 
 
--- ============================================================
 -- >>> migrations/0004_operations.sql
--- ============================================================
 -- ISOPoz — Migration 0004 : opérations (chantiers, planning, équipes, salariés, matériel)
 -- Exécuter après 0003. Idempotent autant que possible.
 
@@ -975,9 +966,7 @@ drop policy if exists mr_wr on public.material_requests;
 create policy mr_wr on public.material_requests for all using ( auth_is_super_admin() or auth_has_permission('employees.edit') ) with check ( auth_is_super_admin() or auth_has_permission('employees.edit') );
 
 
--- ============================================================
 -- >>> migrations/0005_finance.sql
--- ============================================================
 -- ISOPoz — Migration 0005 : finance (factures, paiements, relances)
 -- Exécuter après 0004. Idempotent autant que possible.
 
@@ -1125,9 +1114,7 @@ drop policy if exists rem_wr on public.reminders;
 create policy rem_wr on public.reminders for all using ( auth_is_super_admin() or auth_has_permission('reminders.create') or auth_has_permission('reminders.send') ) with check ( auth_is_super_admin() or auth_has_permission('reminders.create') or auth_has_permission('reminders.send') );
 
 
--- ============================================================
 -- >>> migrations/0006_purchasing.sql
--- ============================================================
 -- ISOPoz — Migration 0006 : achats (fournisseurs, produits, commandes, négociations)
 -- Exécuter après 0005. Idempotent autant que possible.
 
@@ -1307,9 +1294,7 @@ drop policy if exists gr_wr on public.goods_receipts;
 create policy gr_wr on public.goods_receipts for all using ( auth_is_super_admin() or auth_has_permission('orders.edit') ) with check ( auth_is_super_admin() or auth_has_permission('orders.edit') );
 
 
--- ============================================================
 -- >>> migrations/0007_notifications.sql
--- ============================================================
 -- ISOPoz — Migration 0007 : ciblage des notifications
 -- Exécuter après 0006. Idempotent.
 
@@ -1339,9 +1324,7 @@ returns setof uuid language sql stable security definer set search_path = public
 $$;
 
 
--- ============================================================
 -- >>> migrations/0008_hr.sql
--- ============================================================
 -- ISOPoz — Migration 0008 : RH (fiches de paie, documents RH) + portail salarié
 -- Exécuter après 0007. Idempotent.
 
@@ -1428,9 +1411,7 @@ drop policy if exists wd_self_sel on public.ephemeral_workdays;
 create policy wd_self_sel on public.ephemeral_workdays for select using ( employee_id = auth_employee_id() );
 
 
--- ============================================================
 -- >>> migrations/0009_site.sql
--- ============================================================
 -- ISOPoz — Migration 0009 : site vitrine public + simulateur configurable
 -- Exécuter après 0008. Idempotent. Gestion réservée à admin.settings.
 
@@ -1524,10 +1505,17 @@ insert into storage.buckets (id, name, public)
 values ('site-media', 'site-media', true)
 on conflict (id) do nothing;
 
--- Lecture publique du bucket site-media ; écriture via service_role (serveur)
-drop policy if exists site_media_read on storage.objects;
-create policy site_media_read on storage.objects for select
-  using ( bucket_id = 'site-media' );
+-- Lecture publique du bucket site-media ; écriture via service_role (serveur).
+-- Tolérant aux erreurs de droits sur storage.objects (n'interrompt pas la migration).
+do $$
+begin
+  begin
+    drop policy if exists site_media_read on storage.objects;
+    create policy site_media_read on storage.objects for select using ( bucket_id = 'site-media' );
+  exception when others then
+    raise notice 'Policy storage.objects non créée (%). Le bucket site-media étant public, la lecture reste possible.', sqlerrm;
+  end;
+end $$;
 
 -- ============================================================
 -- RLS : lecture publique du contenu publié, écriture admin.settings
@@ -1590,9 +1578,7 @@ insert into public.reviews (author_name, author_role, rating, content, position)
 on conflict do nothing;
 
 
--- ============================================================
 -- >>> seed.sql
--- ============================================================
 -- ISOPoz — Seed : catalogue de permissions + rôles système
 -- Exécuter après 0001_core.sql. Idempotent.
 

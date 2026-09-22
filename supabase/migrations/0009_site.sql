@@ -91,10 +91,17 @@ insert into storage.buckets (id, name, public)
 values ('site-media', 'site-media', true)
 on conflict (id) do nothing;
 
--- Lecture publique du bucket site-media ; écriture via service_role (serveur)
-drop policy if exists site_media_read on storage.objects;
-create policy site_media_read on storage.objects for select
-  using ( bucket_id = 'site-media' );
+-- Lecture publique du bucket site-media ; écriture via service_role (serveur).
+-- Tolérant aux erreurs de droits sur storage.objects (n'interrompt pas la migration).
+do $$
+begin
+  begin
+    drop policy if exists site_media_read on storage.objects;
+    create policy site_media_read on storage.objects for select using ( bucket_id = 'site-media' );
+  exception when others then
+    raise notice 'Policy storage.objects non créée (%). Le bucket site-media étant public, la lecture reste possible.', sqlerrm;
+  end;
+end $$;
 
 -- ============================================================
 -- RLS : lecture publique du contenu publié, écriture admin.settings

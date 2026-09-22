@@ -2,10 +2,19 @@ import "server-only";
 import { createClient as createServerClient } from "@/core/supabase/server";
 import type { SiteSettings } from "./queries";
 
+const DEFAULTS = {
+  company_name: "ISOPoz", tagline: "Votre spécialiste de l'isolation et de la pose",
+  hero_title: "Isolation & rénovation, faites confiance à des experts",
+  hero_subtitle: "Devis gratuit, intervention rapide, travaux garantis.",
+  about_title: "À propos d'ISOPoz", about_text: "Entreprise spécialisée dans l'isolation.",
+  phone: "", email: "contact@isopoz.fr", address: "", cta_text: "Demandez votre devis gratuit",
+  simulator_enabled: true, simulator_title: "Estimez votre projet en 1 minute",
+};
+
 export async function getSettingsAdmin(): Promise<SiteSettings & Record<string, unknown>> {
   const supabase = await createServerClient();
-  const { data } = await supabase.from("site_settings").select("*").eq("id", true).single();
-  return data as SiteSettings & Record<string, unknown>;
+  const { data } = await supabase.from("site_settings").select("*").eq("id", true).maybeSingle();
+  return (data as SiteSettings & Record<string, unknown>) ?? (DEFAULTS as unknown as SiteSettings & Record<string, unknown>);
 }
 
 export async function listAllReviews() {
