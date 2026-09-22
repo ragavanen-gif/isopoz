@@ -15,7 +15,7 @@ export default async function LoginPage({
         </div>
         <div className="rounded-[var(--radius-app)] bg-surface p-6 shadow-xl">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="ISOPOZ" className="mx-auto mb-5 h-12 w-auto" />
+          <img src="/logo.png" alt="ISOPOZ" className="mx-auto mb-5 h-16 w-auto" />
           <h2 className="mb-1 text-lg font-semibold">Connexion</h2>
           <p className="mb-5 text-sm text-muted-foreground">
             Accédez à votre espace de travail.
