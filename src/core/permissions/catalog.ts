@@ -25,6 +25,7 @@ export const PERMISSION_KEYS = [
   "analytics.view",
   "admin.users", "admin.roles", "admin.permissions", "admin.settings", "admin.audit",
   "portal.self",
+  "tools.view", "tools.manage",
 ] as const;
 
 export type PermissionKey = (typeof PERMISSION_KEYS)[number];
@@ -51,4 +52,5 @@ export const PERMISSION_MODULES: Record<string, string> = {
   analytics: "Analyses",
   admin: "Administration",
   portal: "Portail salarié",
+  tools: "Outils",
 };

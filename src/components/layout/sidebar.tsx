@@ -5,14 +5,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, FileText, HardHat, Calendar, UserCog, Wrench,
-  Package, FolderOpen, BarChart3, Settings, Menu, X, UserCircle,
+  Package, FolderOpen, BarChart3, Settings, Menu, X, UserCircle, Calculator,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { NavGroup } from "./nav-config";
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   LayoutDashboard, Users, FileText, HardHat, Calendar, UserCog, Wrench,
-  Package, FolderOpen, BarChart3, Settings, UserCircle,
+  Package, FolderOpen, BarChart3, Settings, UserCircle, Calculator,
 };
 
 export function Sidebar({ groups }: { groups: NavGroup[] }) {

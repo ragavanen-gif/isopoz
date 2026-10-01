@@ -105,7 +105,10 @@ insert into public.permissions (key, module, label) values
   ('admin.settings','admin','Gérer les paramètres'),
   ('admin.audit','admin','Consulter le journal d''activité'),
 
-  ('portal.self','portal','Accès portail salarié')
+  ('portal.self','portal','Accès portail salarié'),
+
+  ('tools.view','tools','Voir les outils de chiffrage'),
+  ('tools.manage','tools','Gérer les outils de chiffrage')
 on conflict (key) do update set module = excluded.module, label = excluded.label;
 
 -- ============================================================
@@ -126,7 +129,7 @@ where r.name = 'gestionnaire'
   and p.module in ('clients','requests','quotes','projects','planning','teams',
                    'employees','ephemeral','equipment','invoices','payments',
                    'reminders','suppliers','orders','negotiations','documents',
-                   'templates','analytics')
+                   'templates','analytics','tools')
 on conflict do nothing;
 
 -- Salarié : portail perso

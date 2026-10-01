@@ -96,6 +96,14 @@ export const NAV: NavGroup[] = [
     items: [{ label: "Chiffre d'affaires", href: "/analyse", permission: "analytics.view" }],
   },
   {
+    label: "Outils",
+    icon: "Calculator",
+    items: [
+      { label: "Chiffrage (métré)", href: "/outils/chiffrage", permission: "tools.view" },
+      { label: "Bibliothèque prestations", href: "/outils/chiffrage/prestations", permission: "tools.manage" },
+    ],
+  },
+  {
     label: "Administration",
     icon: "Settings",
     items: [
