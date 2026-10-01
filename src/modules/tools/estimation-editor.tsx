@@ -177,6 +177,7 @@ export function EstimationEditor({ project, prestations }: { project: Estimation
   }
   function finishMeasure() {
     if (tool === "measure" && draft.length >= 2) {
+      if (!scaleFactor) alert("⚠️ Échelle non calibrée : la longueur sera 0 m. Calibrez l'échelle (panneau « Échelle ») puis remesurez.");
       const m: Measurement = {
         id: crypto.randomUUID(), kind: "length", category: category || "Mesure", color: COLORS[colorIdx % COLORS.length],
         points: draft, lengthM: lenMeters(draft), status: "manuel",
@@ -234,11 +235,16 @@ export function EstimationEditor({ project, prestations }: { project: Estimation
 
   /** Prépare une mesure pour une dimension détectée (choisir quoi chiffrer) + surligne. */
   function pickForMeasure(row: AnalysisRow) {
+    if (!scaleFactor) {
+      alert("Calibrez d'abord l'échelle (panneau « Échelle » : tapez 50 → Appliquer, ou utilisez « Calibrer » sur une cote connue). Sinon la longueur sera 0.");
+    }
     setCategory(row.dimension);
     setTool("measure");
     setSearchQ(row.dimension);
     const q = normalize(row.dimension);
     setSearchHits(textItemsRef.current.filter((t) => normalize(t.str).includes(q)).map((t) => ({ x: t.x, y: t.y - t.h, text: t.str })));
+    // Remonte au plan pour tracer
+    containerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
   async function save() {
@@ -305,7 +311,12 @@ export function EstimationEditor({ project, prestations }: { project: Estimation
           <Button size="sm" variant={tool === "calibrate" ? "primary" : "secondary"} onClick={() => { setTool("calibrate"); setDraft([]); }}><Crosshair /> Calibrer</Button>
           <Button size="sm" variant={tool === "measure" ? "primary" : "secondary"} onClick={() => { setTool("measure"); setDraft([]); }}><Ruler /> Mesurer</Button>
           <Button size="sm" variant={tool === "count" ? "primary" : "secondary"} onClick={() => { setTool("count"); setDraft([]); }}><CircleDot /> Compter</Button>
-          {((tool === "measure" && draft.length >= 2) || (tool === "count" && draft.length >= 1)) && <Button size="sm" variant="accent" onClick={finishMeasure}><Plus /> Terminer ({tool === "count" ? `${draft.length} U` : "mesure"})</Button>}
+          {tool === "measure" && draft.length >= 1 && (
+            <span className="rounded-md bg-accent/10 px-2 py-1 text-sm font-medium text-accent">
+              Longueur en cours : {scaleFactor ? `${lenMeters(draft).toFixed(2)} m` : "échelle non calibrée"}
+            </span>
+          )}
+          {((tool === "measure" && draft.length >= 2) || (tool === "count" && draft.length >= 1)) && <Button size="sm" variant="accent" onClick={finishMeasure}><Plus /> Terminer ({tool === "count" ? `${draft.length} U` : `${lenMeters(draft).toFixed(2)} m`})</Button>}
           <div className="mx-1 h-6 w-px bg-border" />
           <Button size="sm" variant="secondary" onClick={() => setZoom((z) => z * 1.25)}><ZoomIn /></Button>
           <Button size="sm" variant="secondary" onClick={() => setZoom((z) => z / 1.25)}><ZoomOut /></Button>
