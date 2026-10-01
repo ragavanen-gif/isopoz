@@ -14,6 +14,7 @@ export type EstimationProject = {
 
 export type Measurement = {
   id: string;
+  kind?: "length" | "count";   // length = polyligne (ml) ; count = accessoires (U)
   category: string;
   color: string;
   points: { x: number; y: number }[];

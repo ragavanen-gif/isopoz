@@ -4,18 +4,47 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   Ruler, Crosshair, Hand, Search, Save, Trash2, ZoomIn, ZoomOut, Maximize,
-  Eye, EyeOff, Download, Plus,
+  Eye, EyeOff, Download, Plus, CircleDot,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { euros } from "@/lib/format";
 import { saveEstimationAction } from "./actions";
 import type { EstimationProject, Measurement, Prestation } from "./queries";
 
 const COLORS = ["#E8641C", "#1d4ed8", "#16a34a", "#dc2626", "#9333ea", "#0891b2", "#ca8a04", "#db2777"];
 const RENDER_SCALE = 2; // qualité de rendu du PDF
-type Tool = "pan" | "measure" | "calibrate" | "search";
+const PT_TO_M = 0.0254 / 72; // 1 point PDF = 1/72 pouce, en mètres (PDF à taille réelle)
+/** Mètres réels par pixel de base, à partir de l'échelle imprimée (ex : 50 pour 1/50). */
+function scaleFromRatio(ratio: number) { return (1 / RENDER_SCALE) * PT_TO_M * ratio; }
+type Tool = "pan" | "measure" | "calibrate" | "search" | "count";
 type Pt = { x: number; y: number };
+
+/** Quantité d'une mesure : nombre d'accessoires (count) ou longueur en m (length). */
+function qtyOf(m: Measurement): number {
+  return m.kind === "count" ? m.points.length : m.lengthM;
+}
+
+type Detection = { famille: "hydraulique" | "aeraulique"; dimension: string; designation: string; plusC: boolean };
+type AnalysisRow = { famille: "hydraulique" | "aeraulique"; dimension: string; reseaux: string[]; plusC: number; occurrences: number };
+
+/** Extrait les désignations (DN, Ø, dimensions de gaine, réseaux, +C) d'un texte. */
+function parseText(s: string): Detection[] {
+  const out: Detection[] = [];
+  const plusC = /\+\s?c\b/i.test(s);
+  const designation = (() => {
+    const m = s.split(/\s[-–]\s/)[0].trim();
+    return /^[A-Za-z]{2,5}\d{0,3}[-–]?[A-Za-z0-9]{0,3}$/.test(m) && m.length <= 10 ? m.toUpperCase() : "—";
+  })();
+  // Hydraulique : DN
+  for (const m of s.matchAll(/\bdn\s?0*(\d{1,4})\b/gi)) out.push({ famille: "hydraulique", dimension: `DN${m[1]}`, designation, plusC });
+  // Aéraulique circulaire : Ø / O / diam
+  for (const m of s.matchAll(/[øØ]\s?0*(\d{2,4})/g)) out.push({ famille: "aeraulique", dimension: `Ø${m[1]}`, designation, plusC });
+  // Aéraulique rectangulaire : AxB (optionnellement "ht")
+  for (const m of s.matchAll(/\b(\d{2,4})\s?[x×]\s?(\d{2,4})\s?(?:ht)?\b/gi)) out.push({ famille: "aeraulique", dimension: `${m[1]}x${m[2]}`, designation, plusC });
+  return out;
+}
 
 const STATUS_LABEL: Record<Measurement["status"], string> = {
   manuel: "Manuel", detecte: "Détecté", a_verifier: "À vérifier", confirme: "Confirmé",
@@ -51,6 +80,10 @@ export function EstimationEditor({ project, prestations }: { project: Estimation
   const [searchQ, setSearchQ] = useState("");
   const [searchHits, setSearchHits] = useState<{ x: number; y: number; text: string }[]>([]);
   const textItemsRef = useRef<{ x: number; y: number; w: number; h: number; str: string }[]>([]);
+
+  const [planRatio, setPlanRatio] = useState("50"); // 1/50 par défaut
+  const [analysis, setAnalysis] = useState<AnalysisRow[] | null>(null);
+  const [anaFilter, setAnaFilter] = useState<"all" | "hydraulique" | "aeraulique" | "plusc">("all");
 
   const panStart = useRef<{ mx: number; my: number; ox: number; oy: number } | null>(null);
 
@@ -125,7 +158,7 @@ export function EstimationEditor({ project, prestations }: { project: Estimation
   }
 
   function onClick(e: React.MouseEvent) {
-    if (tool === "measure" || tool === "calibrate") {
+    if (tool === "measure" || tool === "calibrate" || tool === "count") {
       const p = toBase(e.clientX, e.clientY);
       const next = [...draft, p];
       setDraft(next);
@@ -145,8 +178,15 @@ export function EstimationEditor({ project, prestations }: { project: Estimation
   function finishMeasure() {
     if (tool === "measure" && draft.length >= 2) {
       const m: Measurement = {
-        id: crypto.randomUUID(), category: category || "Mesure", color: COLORS[colorIdx % COLORS.length],
+        id: crypto.randomUUID(), kind: "length", category: category || "Mesure", color: COLORS[colorIdx % COLORS.length],
         points: draft, lengthM: lenMeters(draft), status: "manuel",
+      };
+      setMeasurements((x) => [...x, m]);
+      setDirty(true);
+    } else if (tool === "count" && draft.length >= 1) {
+      const m: Measurement = {
+        id: crypto.randomUUID(), kind: "count", category: category || "Accessoire", color: COLORS[colorIdx % COLORS.length],
+        points: draft, lengthM: 0, status: "manuel",
       };
       setMeasurements((x) => [...x, m]);
       setDirty(true);
@@ -157,7 +197,7 @@ export function EstimationEditor({ project, prestations }: { project: Estimation
   // recalcule les longueurs si l'échelle change
   useEffect(() => {
     if (scaleFactor != null) {
-      setMeasurements((prev) => prev.map((m) => ({ ...m, lengthM: segLenBase(m.points) * scaleFactor })));
+      setMeasurements((prev) => prev.map((m) => m.kind === "count" ? m : ({ ...m, lengthM: segLenBase(m.points) * scaleFactor })));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scaleFactor]);
@@ -167,6 +207,38 @@ export function EstimationEditor({ project, prestations }: { project: Estimation
     if (!q) { setSearchHits([]); return; }
     const hits = textItemsRef.current.filter((t) => normalize(t.str).includes(q)).map((t) => ({ x: t.x, y: t.y - t.h, text: t.str }));
     setSearchHits(hits);
+  }
+
+  /** Applique l'échelle imprimée du plan (1/ratio). À vérifier avec une cote connue. */
+  function applyPlanScale() {
+    const ratio = parseFloat(planRatio.replace(",", "."));
+    if (Number.isFinite(ratio) && ratio > 0) { setScaleFactor(scaleFromRatio(ratio)); setDirty(true); }
+  }
+
+  /** Analyse tout le plan : extrait et regroupe les désignations détectées (CDC §23-24). */
+  function runAnalysis() {
+    const groups = new Map<string, AnalysisRow>();
+    for (const t of textItemsRef.current) {
+      for (const d of parseText(t.str)) {
+        const key = `${d.famille}|${d.dimension}`;
+        const g = groups.get(key) ?? { famille: d.famille, dimension: d.dimension, reseaux: [], plusC: 0, occurrences: 0 };
+        g.occurrences += 1;
+        if (d.plusC) g.plusC += 1;
+        if (d.designation !== "—" && !g.reseaux.includes(d.designation)) g.reseaux.push(d.designation);
+        groups.set(key, g);
+      }
+    }
+    const rows = Array.from(groups.values()).sort((a, b) => a.famille.localeCompare(b.famille) || a.dimension.localeCompare(b.dimension, undefined, { numeric: true }));
+    setAnalysis(rows);
+  }
+
+  /** Prépare une mesure pour une dimension détectée (choisir quoi chiffrer) + surligne. */
+  function pickForMeasure(row: AnalysisRow) {
+    setCategory(row.dimension);
+    setTool("measure");
+    setSearchQ(row.dimension);
+    const q = normalize(row.dimension);
+    setSearchHits(textItemsRef.current.filter((t) => normalize(t.str).includes(q)).map((t) => ({ x: t.x, y: t.y - t.h, text: t.str })));
   }
 
   async function save() {
@@ -201,9 +273,30 @@ export function EstimationEditor({ project, prestations }: { project: Estimation
     return { m, p, puCents, qty, totalCents: Math.round(puCents * qty) };
   });
   const totalCents = chiffrage.reduce((s, c) => s + c.totalCents, 0);
-  const totalML = measurements.reduce((s, m) => s + m.lengthM, 0);
+  const totalML = measurements.reduce((s, m) => s + (m.kind === "count" ? 0 : m.lengthM), 0);
+  const totalAcc = measurements.reduce((s, m) => s + (m.kind === "count" ? m.points.length : 0), 0);
+
+  // Tableau récapitulatif groupé par prestation (désignation · dimension · épaisseur · finition)
+  const recap = (() => {
+    const map = new Map<string, { p?: Prestation; label: string; qty: number; unit: string; puCents: number }>();
+    for (const m of measurements) {
+      const p = prestations.find((pr) => pr.id === m.prestationId);
+      const key = p ? p.id : `__${m.category}__${m.kind}`;
+      const unit = p?.unit ?? (m.kind === "count" ? "u" : "ml");
+      const puCents = p ? Math.round((p.price_supply_cents + p.price_install_cents) * (1 + p.margin_bps / 10000)) : 0;
+      const label = p ? p.name : m.category;
+      const cur = map.get(key) ?? { p, label, qty: 0, unit, puCents };
+      cur.qty += qtyOf(m);
+      map.set(key, cur);
+    }
+    return Array.from(map.values()).map((r) => ({ ...r, totalCents: Math.round(r.puCents * r.qty) }));
+  })();
+
+  const anaRows = (analysis ?? []).filter((r) =>
+    anaFilter === "all" ? true : anaFilter === "plusc" ? r.plusC > 0 : r.famille === anaFilter);
 
   return (
+    <div className="space-y-4">
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_360px]">
       {/* Plan */}
       <div className="space-y-2">
@@ -211,7 +304,8 @@ export function EstimationEditor({ project, prestations }: { project: Estimation
           <Button size="sm" variant={tool === "pan" ? "primary" : "secondary"} onClick={() => { setTool("pan"); setDraft([]); }}><Hand /> Déplacer</Button>
           <Button size="sm" variant={tool === "calibrate" ? "primary" : "secondary"} onClick={() => { setTool("calibrate"); setDraft([]); }}><Crosshair /> Calibrer</Button>
           <Button size="sm" variant={tool === "measure" ? "primary" : "secondary"} onClick={() => { setTool("measure"); setDraft([]); }}><Ruler /> Mesurer</Button>
-          {tool === "measure" && draft.length >= 2 && <Button size="sm" variant="accent" onClick={finishMeasure}><Plus /> Terminer la mesure</Button>}
+          <Button size="sm" variant={tool === "count" ? "primary" : "secondary"} onClick={() => { setTool("count"); setDraft([]); }}><CircleDot /> Compter</Button>
+          {((tool === "measure" && draft.length >= 2) || (tool === "count" && draft.length >= 1)) && <Button size="sm" variant="accent" onClick={finishMeasure}><Plus /> Terminer ({tool === "count" ? `${draft.length} U` : "mesure"})</Button>}
           <div className="mx-1 h-6 w-px bg-border" />
           <Button size="sm" variant="secondary" onClick={() => setZoom((z) => z * 1.25)}><ZoomIn /></Button>
           <Button size="sm" variant="secondary" onClick={() => setZoom((z) => z / 1.25)}><ZoomOut /></Button>
@@ -235,9 +329,17 @@ export function EstimationEditor({ project, prestations }: { project: Estimation
             {dims && (
               <svg width={dims.w} height={dims.h} className="pointer-events-none absolute left-0 top-0">
                 {measurements.filter((m) => !hidden.has(m.id)).map((m) => (
-                  <polyline key={m.id} points={m.points.map((p) => `${p.x},${p.y}`).join(" ")}
-                    fill="none" stroke={m.color} strokeWidth={selected === m.id ? 6 / zoom : 3 / zoom}
-                    strokeLinejoin="round" strokeLinecap="round" opacity={selected && selected !== m.id ? 0.4 : 1} />
+                  m.kind === "count" ? (
+                    <g key={m.id} opacity={selected && selected !== m.id ? 0.4 : 1}>
+                      {m.points.map((p, i) => (
+                        <circle key={i} cx={p.x} cy={p.y} r={(selected === m.id ? 9 : 7) / zoom} fill={m.color} stroke="#fff" strokeWidth={2 / zoom} />
+                      ))}
+                    </g>
+                  ) : (
+                    <polyline key={m.id} points={m.points.map((p) => `${p.x},${p.y}`).join(" ")}
+                      fill="none" stroke={m.color} strokeWidth={selected === m.id ? 6 / zoom : 3 / zoom}
+                      strokeLinejoin="round" strokeLinecap="round" opacity={selected && selected !== m.id ? 0.4 : 1} />
+                  )
                 ))}
                 {draft.length > 0 && (
                   <polyline points={draft.map((p) => `${p.x},${p.y}`).join(" ")} fill="none" stroke="#E8641C" strokeDasharray={`${8 / zoom},${6 / zoom}`} strokeWidth={3 / zoom} />
@@ -257,6 +359,21 @@ export function EstimationEditor({ project, prestations }: { project: Estimation
 
       {/* Panneau droit */}
       <div className="space-y-4">
+        {/* Échelle */}
+        <div className="rounded-[var(--radius-app)] border border-border bg-surface p-3">
+          <p className="mb-2 text-sm font-semibold">Échelle</p>
+          <div className="flex items-end gap-2">
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Échelle du plan 1/</label>
+              <Input value={planRatio} onChange={(e) => setPlanRatio(e.target.value)} className="h-9 w-20" inputMode="numeric" />
+            </div>
+            <Button size="sm" variant="secondary" onClick={applyPlanScale}>Appliquer</Button>
+          </div>
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            {scaleFactor ? `Échelle active : 1 px ≈ ${(scaleFactor).toFixed(4)} m.` : "Non calibrée."} ⚠️ À confirmer avec le bouton « Calibrer » sur une cote connue (le PDF n'est pas toujours à sa taille réelle).
+          </p>
+        </div>
+
         {/* Recherche */}
         <div className="rounded-[var(--radius-app)] border border-border bg-surface p-3">
           <p className="mb-2 flex items-center gap-2 text-sm font-semibold"><Search className="size-4" /> Rechercher sur le plan</p>
@@ -283,14 +400,14 @@ export function EstimationEditor({ project, prestations }: { project: Estimation
 
         {/* Liste des mesures */}
         <div className="rounded-[var(--radius-app)] border border-border bg-surface p-3">
-          <p className="mb-2 text-sm font-semibold">Mesures ({measurements.length}) · total {totalML.toFixed(2)} m</p>
+          <p className="mb-2 text-sm font-semibold">Mesures ({measurements.length}) · {totalML.toFixed(2)} m{totalAcc > 0 ? ` · ${totalAcc} accessoire(s)` : ""}</p>
           {measurements.length === 0 ? <p className="text-xs text-muted-foreground">Aucune mesure. Calibrez l'échelle puis mesurez.</p> : (
             <ul className="space-y-2 text-sm">
               {measurements.map((m) => (
                 <li key={m.id} className={`rounded-md border p-2 ${selected === m.id ? "border-primary" : "border-border"}`} onMouseEnter={() => setSelected(m.id)} onMouseLeave={() => setSelected(null)}>
                   <div className="flex items-center justify-between gap-2">
-                    <span className="flex items-center gap-2"><span className="inline-block size-3 rounded-full" style={{ background: m.color }} /> {m.category}</span>
-                    <span className="tabular-nums font-medium">{m.lengthM.toFixed(2)} m</span>
+                    <span className="flex items-center gap-2"><span className="inline-block size-3 rounded-full" style={{ background: m.color }} /> {m.category}{m.kind === "count" ? " (accessoire)" : ""}</span>
+                    <span className="tabular-nums font-medium">{m.kind === "count" ? `× ${m.points.length} U` : `${m.lengthM.toFixed(2)} m`}</span>
                   </div>
                   <div className="mt-2 flex items-center gap-1">
                     <Select value={m.prestationId ?? ""} onChange={(e) => { setMeasurements((x) => x.map((v) => v.id === m.id ? { ...v, prestationId: e.target.value || null } : v)); setDirty(true); }} className="h-8 flex-1 text-xs">
@@ -308,32 +425,92 @@ export function EstimationEditor({ project, prestations }: { project: Estimation
           )}
         </div>
 
-        {/* Chiffrage */}
+        {/* Tableau récapitulatif / chiffrage */}
         <div className="rounded-[var(--radius-app)] border border-border bg-surface p-3">
           <div className="mb-2 flex items-center justify-between">
-            <p className="text-sm font-semibold">Chiffrage</p>
+            <p className="text-sm font-semibold">Tableau de métré / chiffrage</p>
             <Button size="sm" variant="secondary" onClick={exportCsv}><Download /> CSV</Button>
           </div>
-          {chiffrage.filter((c) => c.p).length === 0 ? (
-            <p className="text-xs text-muted-foreground">Associez des prestations à vos mesures pour chiffrer.</p>
+          {recap.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Mesurez ou comptez des éléments pour alimenter le tableau.</p>
           ) : (
-            <>
-              <ul className="space-y-1 text-sm">
-                {chiffrage.filter((c) => c.p).map((c) => (
-                  <li key={c.m.id} className="flex items-center justify-between">
-                    <span className="truncate text-xs">{c.m.category} · {c.p!.name}</span>
-                    <span className="tabular-nums">{euros(c.totalCents)}</span>
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-2 flex items-center justify-between border-t border-border pt-2 font-semibold">
-                <span>Total HT</span><span className="tabular-nums text-primary">{euros(totalCents)}</span>
-              </div>
-            </>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead className="border-b border-border text-left text-muted-foreground">
+                  <tr><th className="py-1 pr-2">Désignation</th><th className="pr-2">Ép.</th><th className="pr-2 text-right">Qté</th><th className="pr-2">Unité</th><th className="text-right">Montant</th></tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {recap.map((r, i) => (
+                    <tr key={i}>
+                      <td className="py-1 pr-2">{r.label}{r.p?.dimension ? ` · ${r.p.dimension}` : ""}{r.p?.finish ? ` · ${r.p.finish}` : ""}</td>
+                      <td className="pr-2 text-muted-foreground">{r.p?.thickness ?? "—"}</td>
+                      <td className="pr-2 text-right tabular-nums">{r.unit === "u" || r.unit === "forfait" ? r.qty : r.qty.toFixed(2)}</td>
+                      <td className="pr-2">{r.unit}</td>
+                      <td className="text-right tabular-nums">{r.puCents ? euros(r.totalCents) : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t border-border font-semibold"><td colSpan={4} className="py-1">Total HT</td><td className="text-right tabular-nums text-primary">{euros(totalCents)}</td></tr>
+                </tfoot>
+              </table>
+            </div>
           )}
           <p className="mt-2 text-[11px] text-muted-foreground">Rappel : seules les longueurs réellement mesurées sont comptées. Rien n'est inventé.</p>
         </div>
       </div>
+    </div>
+
+    {/* Analyse automatique du plan (CDC §23-27) */}
+    <div className="rounded-[var(--radius-app)] border border-border bg-surface p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-base font-semibold">Analyse automatique du plan</p>
+          <p className="text-sm text-muted-foreground">Détecte et regroupe toutes les désignations (DN, Ø, gaines, réseaux, +C) d'après le texte du plan.</p>
+        </div>
+        <Button onClick={runAnalysis} variant="accent"><Search /> Analyser tout le plan</Button>
+      </div>
+
+      {analysis && (
+        <>
+          <div className="mt-4 flex flex-wrap gap-2 text-sm">
+            {([["all", "Tout"], ["hydraulique", "Hydraulique"], ["aeraulique", "Aéraulique"], ["plusc", "Marqués +C"]] as const).map(([k, l]) => (
+              <button key={k} type="button" onClick={() => setAnaFilter(k)} className={`rounded-full px-3 py-1 ${anaFilter === k ? "bg-primary text-primary-foreground" : "bg-muted text-foreground hover:bg-muted/70"}`}>{l}</button>
+            ))}
+            <span className="ml-auto self-center text-xs text-muted-foreground">{analysis.reduce((s, r) => s + r.occurrences, 0)} désignations détectées · {analysis.length} dimensions</span>
+          </div>
+
+          {anaRows.length === 0 ? (
+            <p className="mt-4 text-sm text-muted-foreground">Aucune désignation détectée (le PDF n'est peut-être pas vectoriel, ou utilisez le mode manuel).</p>
+          ) : (
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+                  <tr><th className="py-2 pr-3">Famille</th><th className="pr-3">Dimension</th><th className="pr-3">Réseau(x)</th><th className="pr-3 text-center">+C</th><th className="pr-3 text-right">Occur.</th><th className="pr-3">Longueur</th><th className="pr-3">Statut</th><th></th></tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {anaRows.map((r, i) => (
+                    <tr key={i} className="hover:bg-muted/30">
+                      <td className="py-2 pr-3">{r.famille === "hydraulique" ? "Hydraulique" : "Aéraulique"}</td>
+                      <td className="pr-3 font-medium">{r.dimension}</td>
+                      <td className="pr-3 text-muted-foreground">{r.reseaux.slice(0, 4).join(", ") || "—"}</td>
+                      <td className="pr-3 text-center">{r.plusC > 0 ? <span className="text-accent">✓ {r.plusC}</span> : "—"}</td>
+                      <td className="pr-3 text-right tabular-nums">{r.occurrences}</td>
+                      <td className="pr-3 text-warning">à mesurer</td>
+                      <td className="pr-3"><Badge tone="info">Détecté</Badge></td>
+                      <td className="text-right"><Button size="sm" variant="secondary" onClick={() => pickForMeasure(r)}>Mesurer</Button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <p className="mt-3 text-[11px] text-muted-foreground">
+            ⚠️ L'analyse compte les <strong>occurrences de texte</strong> détectées. Les <strong>longueurs</strong> ne sont pas inventées : cliquez « Mesurer » sur une ligne pour la tracer sur le plan et obtenir le métré réel (le logiciel ne fabrique aucun mètre — CDC §19/§29).
+          </p>
+        </>
+      )}
+    </div>
     </div>
   );
 }
