@@ -7,8 +7,8 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Tout sauf assets statiques et fichiers image
+  // Tout sauf _next et fichiers statiques (images, worker .mjs, .pdf, polices, etc.)
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|mjs|js|css|pdf|txt|woff|woff2|ttf|map)$).*)",
   ],
 };
