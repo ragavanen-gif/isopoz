@@ -11,6 +11,7 @@ import { Input, Select } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { euros } from "@/lib/format";
 import { saveEstimationAction } from "./actions";
+import { extractPolylines, polyLenPx, distToPolyline, type Polyline } from "./pdf-geometry";
 import type { EstimationProject, Measurement, Prestation } from "./queries";
 
 const COLORS = ["#E8641C", "#1d4ed8", "#16a34a", "#dc2626", "#9333ea", "#0891b2", "#ca8a04", "#db2777"];
@@ -80,6 +81,7 @@ export function EstimationEditor({ project, prestations }: { project: Estimation
   const [searchQ, setSearchQ] = useState("");
   const [searchHits, setSearchHits] = useState<{ x: number; y: number; text: string }[]>([]);
   const textItemsRef = useRef<{ x: number; y: number; w: number; h: number; str: string }[]>([]);
+  const polylinesRef = useRef<Polyline[]>([]);
 
   const [planRatio, setPlanRatio] = useState("50"); // 1/50 par défaut
   const [analysis, setAnalysis] = useState<AnalysisRow[] | null>(null);
@@ -115,6 +117,11 @@ export function EstimationEditor({ project, prestations }: { project: Estimation
           const y = viewport.height - tx[5] * RENDER_SCALE;
           return { x, y, w: i.width * RENDER_SCALE, h: (i.height || 8) * RENDER_SCALE, str: i.str };
         });
+        // Géométrie vectorielle (lignes/polylignes) pour la détection auto des longueurs
+        try {
+          const opList = await page.getOperatorList();
+          polylinesRef.current = extractPolylines(opList, viewport, pdfjs.OPS as unknown as Record<string, number>);
+        } catch { polylinesRef.current = []; }
         setDims({ w: viewport.width, h: viewport.height });
         // zoom initial pour tenir dans le conteneur
         const cw = containerRef.current?.clientWidth ?? 800;
@@ -245,6 +252,69 @@ export function EstimationEditor({ project, prestations }: { project: Estimation
     setSearchHits(textItemsRef.current.filter((t) => normalize(t.str).includes(q)).map((t) => ({ x: t.x, y: t.y - t.h, text: t.str })));
     // Remonte au plan pour tracer
     containerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  const DETECT_RADIUS = 90; // px de base : distance max étiquette ↔ polyligne
+
+  /** Trouve les polylignes proches des étiquettes d'une dimension (détection auto). */
+  function detectPolylines(dimension: string): number[] {
+    const q = normalize(dimension);
+    const labels = textItemsRef.current.filter((t) => normalize(t.str).includes(q));
+    const used = new Set<number>();
+    for (const t of labels) {
+      const anchor = { x: t.x + t.w / 2, y: t.y - t.h / 2 };
+      let best = -1, bestD = DETECT_RADIUS;
+      polylinesRef.current.forEach((poly, idx) => {
+        if (poly.points.length < 2) return;
+        const d = distToPolyline(anchor, poly.points);
+        if (d < bestD) { bestD = d; best = idx; }
+      });
+      if (best >= 0) used.add(best);
+    }
+    return Array.from(used);
+  }
+
+  /** Détecte automatiquement les longueurs d'une dimension (statut « détecté »). */
+  function autoDetectRow(row: AnalysisRow) {
+    if (!scaleFactor) { alert("Calibrez l'échelle d'abord (panneau « Échelle »). Sans échelle, impossible de calculer les longueurs."); return; }
+    const idxs = detectPolylines(row.dimension);
+    const color = COLORS[(row.famille === "hydraulique" ? 1 : 0)];
+    // Remplace les détections existantes pour cette dimension
+    setMeasurements((prev) => {
+      const kept = prev.filter((m) => !(m.status === "detecte" && m.category === row.dimension));
+      const added: Measurement[] = idxs.map((i) => {
+        const pts = polylinesRef.current[i].points;
+        return { id: crypto.randomUUID(), kind: "length" as const, category: row.dimension, color, points: pts, lengthM: polyLenPx(pts) * scaleFactor, status: "detecte" as const };
+      });
+      return [...kept, ...added];
+    });
+    setDirty(true);
+    if (idxs.length === 0) alert(`Aucune ligne détectée automatiquement près des étiquettes « ${row.dimension} ». Mesurez manuellement (bouton « Mesurer »).`);
+    else containerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  /** Détecte toutes les longueurs de toutes les dimensions analysées. */
+  function autoDetectAll() {
+    if (!scaleFactor) { alert("Calibrez l'échelle d'abord (panneau « Échelle »)."); return; }
+    if (!analysis) return;
+    setMeasurements((prev) => {
+      const kept = prev.filter((m) => m.status !== "detecte");
+      const added: Measurement[] = [];
+      for (const row of analysis) {
+        const color = COLORS[(row.famille === "hydraulique" ? 1 : 0)];
+        for (const i of detectPolylines(row.dimension)) {
+          const pts = polylinesRef.current[i].points;
+          added.push({ id: crypto.randomUUID(), kind: "length", category: row.dimension, color, points: pts, lengthM: polyLenPx(pts) * scaleFactor, status: "detecte" });
+        }
+      }
+      return [...kept, ...added];
+    });
+    setDirty(true);
+  }
+
+  /** Longueur détectée/mesurée pour une dimension (somme). */
+  function detectedLength(dimension: string): number {
+    return measurements.filter((m) => m.category === dimension && m.kind !== "count").reduce((s, m) => s + m.lengthM, 0);
   }
 
   async function save() {
@@ -479,7 +549,10 @@ export function EstimationEditor({ project, prestations }: { project: Estimation
           <p className="text-base font-semibold">Analyse automatique du plan</p>
           <p className="text-sm text-muted-foreground">Détecte et regroupe toutes les désignations (DN, Ø, gaines, réseaux, +C) d'après le texte du plan.</p>
         </div>
-        <Button onClick={runAnalysis} variant="accent"><Search /> Analyser tout le plan</Button>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={runAnalysis} variant="accent"><Search /> Analyser tout le plan</Button>
+          {analysis && <Button onClick={autoDetectAll} variant="secondary"><Ruler /> Détecter toutes les longueurs</Button>}
+        </div>
       </div>
 
       {analysis && (
@@ -500,24 +573,31 @@ export function EstimationEditor({ project, prestations }: { project: Estimation
                   <tr><th className="py-2 pr-3">Famille</th><th className="pr-3">Dimension</th><th className="pr-3">Réseau(x)</th><th className="pr-3 text-center">+C</th><th className="pr-3 text-right">Occur.</th><th className="pr-3">Longueur</th><th className="pr-3">Statut</th><th></th></tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {anaRows.map((r, i) => (
+                  {anaRows.map((r, i) => {
+                    const dl = detectedLength(r.dimension);
+                    return (
                     <tr key={i} className="hover:bg-muted/30">
                       <td className="py-2 pr-3">{r.famille === "hydraulique" ? "Hydraulique" : "Aéraulique"}</td>
                       <td className="pr-3 font-medium">{r.dimension}</td>
                       <td className="pr-3 text-muted-foreground">{r.reseaux.slice(0, 4).join(", ") || "—"}</td>
                       <td className="pr-3 text-center">{r.plusC > 0 ? <span className="text-accent">✓ {r.plusC}</span> : "—"}</td>
                       <td className="pr-3 text-right tabular-nums">{r.occurrences}</td>
-                      <td className="pr-3 text-warning">à mesurer</td>
-                      <td className="pr-3"><Badge tone="info">Détecté</Badge></td>
-                      <td className="text-right"><Button size="sm" variant="secondary" onClick={() => pickForMeasure(r)}>Mesurer</Button></td>
+                      <td className="pr-3 tabular-nums">{dl > 0 ? <span className="font-medium">{dl.toFixed(2)} m</span> : <span className="text-warning">à mesurer</span>}</td>
+                      <td className="pr-3">{dl > 0 ? <Badge tone="warning">À vérifier</Badge> : <Badge tone="info">Détecté</Badge>}</td>
+                      <td className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button size="sm" onClick={() => autoDetectRow(r)} title="Détecter la longueur automatiquement">Détecter</Button>
+                          <Button size="sm" variant="secondary" onClick={() => pickForMeasure(r)} title="Mesurer manuellement">Mesurer</Button>
+                        </div>
+                      </td>
                     </tr>
-                  ))}
+                  );})}
                 </tbody>
               </table>
             </div>
           )}
           <p className="mt-3 text-[11px] text-muted-foreground">
-            ⚠️ L'analyse compte les <strong>occurrences de texte</strong> détectées. Les <strong>longueurs</strong> ne sont pas inventées : cliquez « Mesurer » sur une ligne pour la tracer sur le plan et obtenir le métré réel (le logiciel ne fabrique aucun mètre — CDC §19/§29).
+            ⚠️ <strong>Détecter</strong> = l'outil cherche la ligne du plan la plus proche de chaque étiquette et calcule sa longueur (statut « À vérifier » — <strong>contrôlez le tracé surligné sur le plan</strong>, il peut se tromper). <strong>Mesurer</strong> = tracé manuel fiable. Le logiciel ne fabrique aucun mètre : s'il ne trouve pas de ligne proche, il laisse « à mesurer » (CDC §19/§29). Nécessite l'échelle calibrée.
           </p>
         </>
       )}
