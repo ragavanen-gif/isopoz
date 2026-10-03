@@ -82,6 +82,7 @@ export function EstimationEditor({ project, prestations }: { project: Estimation
   const [searchHits, setSearchHits] = useState<{ x: number; y: number; text: string }[]>([]);
   const textItemsRef = useRef<{ x: number; y: number; w: number; h: number; str: string }[]>([]);
   const polylinesRef = useRef<Polyline[]>([]);
+  const [vectorCount, setVectorCount] = useState<number | null>(null); // lignes vectorielles trouvées (diagnostic)
 
   const [planRatio, setPlanRatio] = useState("50"); // 1/50 par défaut
   const [analysis, setAnalysis] = useState<AnalysisRow[] | null>(null);
@@ -122,6 +123,7 @@ export function EstimationEditor({ project, prestations }: { project: Estimation
           const opList = await page.getOperatorList();
           polylinesRef.current = extractPolylines(opList, viewport, pdfjs.OPS as unknown as Record<string, number>);
         } catch { polylinesRef.current = []; }
+        setVectorCount(polylinesRef.current.length);
         setDims({ w: viewport.width, h: viewport.height });
         // zoom initial pour tenir dans le conteneur
         const cw = containerRef.current?.clientWidth ?? 800;
@@ -555,6 +557,22 @@ export function EstimationEditor({ project, prestations }: { project: Estimation
         </div>
       </div>
 
+      {/* Diagnostic : géométrie vectorielle disponible pour la détection auto */}
+      {vectorCount !== null && (
+        vectorCount === 0 ? (
+          <div className="mt-3 rounded-[var(--radius-app)] border border-warning/40 bg-warning/10 p-3 text-sm">
+            <p className="font-medium text-warning">Plan sans géométrie vectorielle (0 ligne trouvée)</p>
+            <p className="mt-1 text-muted-foreground">
+              Ce PDF est probablement un plan <strong>scanné (image)</strong> : il ne contient aucun tracé exploitable,
+              donc la détection automatique des longueurs est impossible. Conformément au cahier des charges, aucune
+              longueur n'est inventée — mesurez chaque réseau avec le bouton <strong>« Mesurer »</strong> (après avoir calibré l'échelle).
+            </p>
+          </div>
+        ) : (
+          <p className="mt-3 text-xs text-muted-foreground">{vectorCount} lignes vectorielles trouvées dans le plan (utilisées pour la détection automatique).</p>
+        )
+      )}
+
       {analysis && (
         <>
           <div className="mt-4 flex flex-wrap gap-2 text-sm">
@@ -583,7 +601,7 @@ export function EstimationEditor({ project, prestations }: { project: Estimation
                       <td className="pr-3 text-center">{r.plusC > 0 ? <span className="text-accent">✓ {r.plusC}</span> : "—"}</td>
                       <td className="pr-3 text-right tabular-nums">{r.occurrences}</td>
                       <td className="pr-3 tabular-nums">{dl > 0 ? <span className="font-medium">{dl.toFixed(2)} m</span> : <span className="text-warning">à mesurer</span>}</td>
-                      <td className="pr-3">{dl > 0 ? <Badge tone="warning">À vérifier</Badge> : <Badge tone="info">Détecté</Badge>}</td>
+                      <td className="pr-3">{dl > 0 ? <Badge tone="warning">À vérifier</Badge> : <Badge tone="neutral">À mesurer</Badge>}</td>
                       <td className="text-right">
                         <div className="flex justify-end gap-1">
                           <Button size="sm" onClick={() => autoDetectRow(r)} title="Détecter la longueur automatiquement">Détecter</Button>
